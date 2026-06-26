@@ -118,7 +118,7 @@ export const Map3D: React.FC<Map3DProps> = ({
     map.on("style.load", () => {
       // Intentamos configurar proyección de globo
       try {
-        map.setProjection({ name: "globe" } as any);
+        map.setProjection({ type: "globe" });
       } catch (e) {
         console.warn("La proyección de globo no está soportada:", e);
       }
@@ -146,10 +146,16 @@ export const Map3D: React.FC<Map3DProps> = ({
     };
   }, []);
 
+  const isFirstRender = useRef(true);
+
   // Cambiar estilo dinámicamente si cambia styleUrl
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setIsStyleLoaded(false);
     map.setStyle(styleUrl);
   }, [styleUrl]);
@@ -281,6 +287,13 @@ export const Map3D: React.FC<Map3DProps> = ({
       if (map.getLayer(buildingLayerId)) {
         map.setLayoutProperty(buildingLayerId, "visibility", "none");
       }
+    }
+
+    // Asegurar proyección de globo después de mutaciones del estilo
+    try {
+      map.setProjection({ type: "globe" });
+    } catch (e) {
+      console.warn("La proyección de globo no está soportada en el sync effect:", e);
     }
   }, [isStyleLoaded, showSatellite, enableTerrain, enable3DBuildings, styleUrl]);
 
