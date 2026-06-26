@@ -465,6 +465,67 @@ function App() {
               style={{ width: "38px", height: "18px", cursor: "pointer", accentColor: "#6366f1", opacity: showSatellite ? 0.5 : 1 }}
             />
           </div>
+
+          {/* Selector de Estilos/Capas de Mapa */}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              backgroundColor: "rgba(255, 255, 255, 0.03)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+              padding: "6px",
+              borderRadius: "16px",
+              marginTop: "14px",
+              boxSizing: "border-box"
+            }}
+          >
+            {[
+              {
+                id: "mapa",
+                label: "Mapa",
+                bg: "linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)",
+                active: !showSatellite && styleUrl.includes("liberty"),
+              },
+              {
+                id: "satelite",
+                label: "Satélite",
+                bg: "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+                active: showSatellite,
+              },
+              {
+                id: "oscuro",
+                label: "Oscuro",
+                bg: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                active: !showSatellite && styleUrl.includes("dark"),
+              },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleStyleChange(item.id as "mapa" | "oscuro" | "satelite")}
+                style={{
+                  flex: 1,
+                  height: "50px",
+                  borderRadius: "10px",
+                  background: item.bg,
+                  border: item.active ? "2px solid #6366f1" : "1px solid rgba(255, 255, 255, 0.1)",
+                  color: "#ffffff",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+                  transition: "transform 0.15s ease",
+                  boxSizing: "border-box",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Destinos */}
@@ -507,70 +568,7 @@ function App() {
         </div>
       </div>
 
-      {/* 2. Selector de Capas / Estilos (Bottom-Left) */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "24px",
-          left: "20px",
-          display: "flex",
-          gap: "10px",
-          backgroundColor: "rgba(15, 23, 42, 0.75)",
-          backdropFilter: "blur(8px)",
-          padding: "8px",
-          borderRadius: "12px",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
-          zIndex: 10,
-        }}
-      >
-        {[
-          {
-            id: "mapa",
-            label: "Mapa",
-            bg: "linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)",
-            active: !showSatellite && styleUrl.includes("liberty"),
-          },
-          {
-            id: "satelite",
-            label: "Satélite",
-            bg: "linear-gradient(135deg, #10b981 0%, #047857 100%)",
-            active: showSatellite,
-          },
-          {
-            id: "oscuro",
-            label: "Oscuro",
-            bg: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
-            active: !showSatellite && styleUrl.includes("dark"),
-          },
-        ].map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleStyleChange(item.id as "mapa" | "oscuro" | "satelite")}
-            style={{
-              width: "64px",
-              height: "64px",
-              borderRadius: "8px",
-              background: item.bg,
-              border: item.active ? "2.5px solid #6366f1" : "1.5px solid rgba(255, 255, 255, 0.2)",
-              color: "#ffffff",
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              textShadow: "0 1px 3px rgba(0,0,0,0.8)",
-              transition: "transform 0.15s ease",
-              boxSizing: "border-box",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+
     </div>
   );
 }
