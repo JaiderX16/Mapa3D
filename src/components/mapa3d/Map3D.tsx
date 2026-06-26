@@ -112,12 +112,13 @@ export const Map3D: React.FC<Map3DProps> = ({
     });
 
     mapRef.current = map;
+    (window as any).map = map;
 
     // Manejar carga inicial y re-cargas de estilo
     map.on("style.load", () => {
       // Intentamos configurar proyección de globo
       try {
-        map.setProjection({ type: "globe" });
+        map.setProjection({ name: "globe" } as any);
       } catch (e) {
         console.warn("La proyección de globo no está soportada:", e);
       }
