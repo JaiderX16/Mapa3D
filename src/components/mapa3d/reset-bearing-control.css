@@ -1,0 +1,152 @@
+/* Estilos para el botón de reseteo de orientación (brújula) */
+.geolibre-reset-bearing-ctrl .geolibre-reset-bearing-button {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  background-color: #ffffff;
+  border: 0;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  width: 29px;
+  height: 29px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.geolibre-reset-bearing-needle {
+  height: 24px;
+  transform-origin: 50% 50%;
+  width: 24px;
+  transition: transform 150ms ease;
+}
+
+.geolibre-reset-bearing-needle-label {
+  fill: #1e293b;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  pointer-events: none;
+  transition: fill 150ms ease;
+  user-select: none;
+}
+
+.geolibre-reset-bearing-needle-north {
+  fill: #1e293b;
+  transition: fill 150ms ease;
+}
+
+/* Cola de la aguja (Sur) más delgada y gris */
+.geolibre-reset-bearing-needle-south {
+  fill: #cbd5e1;
+}
+
+/* Cuando se rota el mapa, la aguja y la "N" se vuelven rojas */
+.geolibre-reset-bearing-button--active .geolibre-reset-bearing-needle-north,
+.geolibre-reset-bearing-button--active .geolibre-reset-bearing-needle-label {
+  fill: #ef4444; /* Color rojo de advertencia/activo */
+}
+
+.geolibre-reset-bearing-ctrl .geolibre-reset-bearing-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Marcador personalizado de punto rojo pulsante */
+.custom-marker-red-dot {
+  width: 14px;
+  height: 14px;
+  background-color: #ef4444;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.custom-marker-red-dot::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ef4444;
+  animation: marker-pulse-ring 1.8s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+  pointer-events: none;
+}
+
+@keyframes marker-pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Marcador personalizado con imagen circular (Avatar) */
+.custom-marker-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.custom-marker-avatar:hover {
+  transform: scale(1.15) translateY(-2px);
+  z-index: 999;
+}
+
+/* El pin de conexión (puntero) debajo del avatar circular */
+.custom-marker-avatar::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid #ffffff;
+  pointer-events: none;
+}
+
+/* Sobrescribir el popup de MapLibre para nuestro diseño premium */
+.maplibregl-popup.custom-place-popup {
+  max-width: 350px !important;
+  z-index: 15;
+  animation: popup-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.maplibregl-popup.custom-place-popup .maplibregl-popup-content {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* Colorear el tip de conexión (flecha) según el fondo de nuestra tarjeta */
+.maplibregl-popup.custom-place-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: rgba(15, 23, 42, 0.94) !important;
+}
+
+@keyframes popup-fade-in {
+  from {
+    transform: scale(0.9) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
