@@ -2,6 +2,21 @@ import { useState } from "react";
 import { Map3D, type MarkerData } from "./components/mapa3d/Map3D";
 import maplibregl from "maplibre-gl";
 
+const CloseIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+);
+
+const MenuIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="12" x2="21" y2="12"></line>
+    <line x1="3" y1="6" x2="21" y2="6"></line>
+    <line x1="3" y1="18" x2="21" y2="18"></line>
+  </svg>
+);
+
 function App() {
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [enableTerrain, setEnableTerrain] = useState(true);
@@ -11,6 +26,7 @@ function App() {
   
   const [selectedPlace, setSelectedPlace] = useState<MarkerData | null>(null);
   const [activeKey, setActiveKey] = useState<string>("huancayo");
+  const [isOpen, setIsOpen] = useState(true);
 
   // Interfaz para definir un destino icónico
   interface Destination {
@@ -355,46 +371,70 @@ function App() {
         initialBearing={destinations[0].bearing}
       />
 
-      {/* 1. Panel de Configuración Lateral (Glassmorphism) */}
-      <div
+      {/* Botón flotante para abrir el panel si está cerrado */}
+      <button
+        onClick={() => setIsOpen(true)}
+        className="sidebar-toggle-btn"
         style={{
-          position: "absolute",
-          top: "20px",
-          left: "20px",
-          width: "320px",
-          maxHeight: "calc(100vh - 40px)",
-          display: "flex",
-          flexDirection: "column",
-          backgroundColor: "rgba(15, 23, 42, 0.8)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
-          borderRadius: "16px",
-          padding: "20px",
-          color: "#f8fafc",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.4)",
-          fontFamily: "Inter, sans-serif",
-          zIndex: 10,
-          boxSizing: "border-box"
+          opacity: isOpen ? 0 : 1,
+          pointerEvents: isOpen ? "none" : "auto",
+          transform: isOpen ? "scale(0.8) rotate(-45deg)" : "scale(1) rotate(0deg)"
         }}
+        title="Abrir Navegación"
       >
-        {/* Cabecera */}
-        <div style={{ marginBottom: "16px" }}>
-          <h2
+        <MenuIcon />
+      </button>
+
+      {/* 1. Panel de Configuración Lateral (Glassmorphism) */}
+      <div className={`sidebar-user ${isOpen ? "open" : "closed"}`}>
+        {/* Cabecera con botón de cerrar */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "1.15rem",
+                fontWeight: 700,
+                background: "linear-gradient(90deg, #38bdf8, #818cf8)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Navegación 3D
+            </h2>
+            <p style={{ margin: "4px 0 0 0", fontSize: "0.75rem", color: "#94a3b8" }}>
+              Explora relieves, edificios e info de lugares
+            </p>
+          </div>
+          <button
+            onClick={() => setIsOpen(false)}
             style={{
-              margin: 0,
-              fontSize: "1.15rem",
-              fontWeight: 700,
-              background: "linear-gradient(90deg, #38bdf8, #818cf8)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: "50%",
+              width: "36px",
+              height: "36px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#94a3b8",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#ffffff";
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.12)";
+              e.currentTarget.style.transform = "scale(1.05)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#94a3b8";
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+            title="Cerrar Navegación"
           >
-            Navegación 3D
-          </h2>
-          <p style={{ margin: "4px 0 0 0", fontSize: "0.75rem", color: "#94a3b8" }}>
-            Explora relieves, edificios e info de lugares
-          </p>
+            <CloseIcon />
+          </button>
         </div>
 
         {/* Capas y Opciones */}

@@ -49,3 +49,72 @@ body {
 .destinations-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Sidebar Estetica y Comportamiento */
+.sidebar-user {
+  position: absolute;
+  z-index: 1000;
+  overflow: hidden;
+  will-change: transform, opacity;
+  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1), opacity 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  top: 16px;
+  left: 16px;
+  bottom: 16px;
+  width: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(28, 28, 30, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-family: 'Inter', sans-serif;
+  box-sizing: border-box;
+  padding: 24px;
+}
+
+@media (min-width: 768px) {
+  .sidebar-user {
+    width: clamp(380px, 35vw, 460px);
+  }
+}
+
+.sidebar-user.closed {
+  transform: translateX(calc(-100% - 32px)) scale(0.95);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-user.open {
+  transform: translateX(0) scale(1);
+  opacity: 1;
+}
+
+/* Botón flotante para abrir Sidebar */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 999;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(28, 28, 30, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.3s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  transform: scale(1.08);
+  background-color: rgba(28, 28, 30, 0.85);
+}
+
