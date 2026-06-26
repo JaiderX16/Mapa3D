@@ -325,7 +325,7 @@ function App() {
       setStyleUrl("https://tiles.openfreemap.org/styles/liberty");
       setShowSatellite(false);
     } else if (type === "oscuro") {
-      setStyleUrl("https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json");
+      setStyleUrl("https://tiles.openfreemap.org/styles/dark");
       setShowSatellite(false);
     } else if (type === "satelite") {
       setShowSatellite(true);
