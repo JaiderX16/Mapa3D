@@ -260,11 +260,13 @@ export const Map3D: React.FC<Map3DProps> = ({
             "fill-extrusion-color": buildingColors as any,
             "fill-extrusion-height": [
               "coalesce",
+              ["get", "render_height"],
               ["get", "height"],
               15
             ],
             "fill-extrusion-base": [
               "coalesce",
+              ["get", "render_min_height"],
               ["get", "min_height"],
               0
             ],
