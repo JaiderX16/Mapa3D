@@ -133,9 +133,9 @@ export const Map3D: React.FC<Map3DProps> = ({
       visualizePitch: true,
       showZoom: true,
       showCompass: false
-    }), "top-right");
+    }), "bottom-right");
 
-    map.addControl(new ResetBearingControl(), "top-right");
+    map.addControl(new ResetBearingControl(), "bottom-right");
 
     return () => {
       if (mapRef.current) {

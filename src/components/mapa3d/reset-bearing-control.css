@@ -1,18 +1,57 @@
-/* Estilos para el botón de reseteo de orientación (brújula) */
-.geolibre-reset-bearing-ctrl .geolibre-reset-bearing-button {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-  background-color: #ffffff;
-  border: 0;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-  width: 29px;
-  height: 29px;
-  cursor: pointer;
-  padding: 0;
+/* Custom MapLibre Zoom and Compass Controls - Bottom Right Stack */
+.maplibregl-ctrl-bottom-right {
+  display: flex !important;
+  flex-direction: column-reverse !important; /* ResetBearing on top, Zoom In/Out below */
+  gap: 12px !important;
+  margin-bottom: 24px !important;
+  margin-right: 24px !important;
 }
 
+/* Remove default container styles */
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+/* Style every button as a circular glassmorphic control matching the sidebar */
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group button,
+.geolibre-reset-bearing-ctrl .geolibre-reset-bearing-button {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background-color: rgba(28, 28, 30, 0.45) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s ease, opacity 0.2s ease !important;
+}
+
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group button:hover,
+.geolibre-reset-bearing-ctrl .geolibre-reset-bearing-button:hover {
+  background-color: rgba(28, 28, 30, 0.75) !important;
+  transform: scale(1.08) !important;
+}
+
+/* Style the default icons to be white using invert filter */
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group button span.maplibregl-ctrl-icon {
+  filter: invert(1) brightness(2) !important;
+  transform: scale(1.1) !important;
+}
+
+/* Compass Needle Styling */
 .geolibre-reset-bearing-needle {
   height: 24px;
   transform-origin: 50% 50%;
@@ -21,7 +60,7 @@
 }
 
 .geolibre-reset-bearing-needle-label {
-  fill: #1e293b;
+  fill: #94a3b8;
   font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-size: 8px;
   font-weight: 700;
@@ -31,13 +70,13 @@
 }
 
 .geolibre-reset-bearing-needle-north {
-  fill: #1e293b;
+  fill: #e2e8f0;
   transition: fill 150ms ease;
 }
 
 /* Cola de la aguja (Sur) más delgada y gris */
 .geolibre-reset-bearing-needle-south {
-  fill: #cbd5e1;
+  fill: rgba(255, 255, 255, 0.35);
 }
 
 /* Cuando se rota el mapa, la aguja y la "N" se vuelven rojas */
@@ -47,8 +86,8 @@
 }
 
 .geolibre-reset-bearing-ctrl .geolibre-reset-bearing-button:disabled {
-  cursor: default;
-  opacity: 0.6;
+  cursor: default !important;
+  opacity: 0.5 !important;
 }
 
 /* Marcador personalizado de punto rojo pulsante */
