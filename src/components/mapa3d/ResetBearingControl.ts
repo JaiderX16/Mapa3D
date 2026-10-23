@@ -32,7 +32,7 @@ export function resetBearingState(
  * A MapLibre control that resets the map's bearing and pitch back to north-up
  * and flat in a single click.
  *
- * The button is active the moment the view is rotated or tilted, showing a red, 
+ * The button is active the moment the view is rotated or tilted, showing a red,
  * rotating compass needle that tracks the live bearing.
  */
 export class ResetBearingControl implements maplibregl.IControl {

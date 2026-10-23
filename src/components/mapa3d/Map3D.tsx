@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import maplibregl from "maplibre-gl";
 import { ResetBearingControl } from "./ResetBearingControl";
+import { PlaceDetailCard } from "./PlaceDetailCard";
 
-// Estilos necesarios de MapLibre y de nuestro control de brújula
+// Estilos necesarios de MapLibre, de nuestro control de brújula y de marcadores/popup
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./reset-bearing-control.css";
+import "./map3d.css";
 
 export interface MarkerData {
   id: string;
@@ -51,6 +53,7 @@ interface Map3DProps {
 
 // Configuración del terreno 3D (Terrarium de AWS)
 const TERRAIN_SOURCE_ID = "raster-dem-terrain";
+const TERRAIN_EXAGGERATION = 1.5;
 const TERRAIN_SOURCE: maplibregl.RasterDEMSourceSpecification = {
   type: "raster-dem",
   tiles: [
@@ -74,6 +77,52 @@ const SATELLITE_SOURCE: maplibregl.RasterSourceSpecification = {
   attribution: "Tiles &copy; Esri &mdash; Source: Esri",
 };
 
+const BUILDINGS_LAYER_ID = "3d-buildings-extrusion";
+
+// Zoom máximo normal y en satélite (limitado para evitar el error "Map data not yet available" de Esri en Huancayo)
+const MAX_ZOOM = 20;
+const SATELLITE_MAX_ZOOM = 17;
+
+// Cielo del globo. El halo de la atmósfera se ve al alejarse y se desvanece al acercarse a la ciudad.
+// "fog-ground-blend": 1 desactiva la niebla sobre el terreno, que MapLibre no soporta en el globo.
+const ATMOSPHERE_BLEND: maplibregl.SkySpecification["atmosphere-blend"] = [
+  "interpolate", ["linear"], ["zoom"],
+  0, 1,
+  10, 1,
+  12, 0,
+];
+const LIGHT_SKY: maplibregl.SkySpecification = {
+  "sky-color": "#88c6fc",
+  "horizon-color": "#e0f2fe",
+  "sky-horizon-blend": 0.7,
+  "fog-ground-blend": 1,
+  "atmosphere-blend": ATMOSPHERE_BLEND,
+};
+const DARK_SKY: maplibregl.SkySpecification = {
+  "sky-color": "#0b1120",
+  "horizon-color": "#1e293b",
+  "sky-horizon-blend": 0.7,
+  "fog-ground-blend": 1,
+  "atmosphere-blend": ATMOSPHERE_BLEND,
+};
+
+// Textos de los controles de MapLibre en español
+const MAP_LOCALE: Record<string, string> = {
+  "AttributionControl.ToggleAttribution": "Mostrar u ocultar atribución",
+  "AttributionControl.MapFeedback": "Comentarios sobre el mapa",
+  "Map.Title": "Mapa",
+  "Marker.Title": "Marcador del mapa",
+  "NavigationControl.ZoomIn": "Acercar",
+  "NavigationControl.ZoomOut": "Alejar",
+  "Popup.Close": "Cerrar",
+};
+
+// Separación entre el popup y la parte superior de cada tipo de marcador (ver map3d.css)
+const POPUP_OFFSET_AVATAR = -68;
+const POPUP_OFFSET_DOT = -22;
+
+const isDarkStyle = (styleUrl: string) => styleUrl.toLowerCase().includes("dark");
+
 export const Map3D: React.FC<Map3DProps> = ({
   styleUrl = "https://tiles.openfreemap.org/styles/liberty",
   initialCenter = [-74.006, 40.7128],
@@ -92,72 +141,98 @@ export const Map3D: React.FC<Map3DProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
-  const popupRef = useRef<maplibregl.Popup | null>(null);
-  const popupRootRef = useRef<any>(null);
-  const [isStyleLoaded, setIsStyleLoaded] = useState(false);
+  // La vista inicial solo se lee al crear el mapa
+  const initialViewRef = useRef({
+    center: initialCenter,
+    zoom: initialZoom,
+    pitch: initialPitch,
+    bearing: initialBearing,
+  });
+  // Callbacks más recientes, para que los listeners del mapa nunca usen versiones obsoletas
+  const onMapLoadRef = useRef(onMapLoad);
+  const onMarkerClickRef = useRef(onMarkerClick);
+  useEffect(() => {
+    onMapLoadRef.current = onMapLoad;
+    onMarkerClickRef.current = onMarkerClick;
+  });
+
+  // URL del estilo que MapLibre está terminando de procesar (se fija en transformStyle,
+  // justo antes de que se dispare "style.load") y URL del último estilo cargado por completo.
+  const parsingStyleUrlRef = useRef<string | null>(null);
+  const [loadedStyleUrl, setLoadedStyleUrl] = useState<string | null>(null);
+  // Comparar con la URL pedida evita tocar capas de un estilo que todavía se está cargando
+  const isStyleLoaded = loadedStyleUrl === styleUrl;
+
+  // Nodo donde React pinta la tarjeta del popup (mediante un portal)
+  const [popupContainer] = useState(() => document.createElement("div"));
 
   // Inicializar mapa (una sola vez)
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    const container = mapContainerRef.current;
+    if (!container) return;
 
     const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: styleUrl,
-      center: initialCenter,
-      zoom: initialZoom,
-      pitch: initialPitch,
-      bearing: initialBearing,
+      container,
+      ...initialViewRef.current,
       maxPitch: 85,
+      maxZoom: MAX_ZOOM,
+      locale: MAP_LOCALE,
     });
 
     mapRef.current = map;
-    (window as any).map = map;
+    if (import.meta.env.DEV) {
+      // Acceso rápido desde la consola del navegador durante el desarrollo
+      (window as unknown as { map?: maplibregl.Map }).map = map;
+    }
 
     // Manejar carga inicial y re-cargas de estilo
     map.on("style.load", () => {
-      // Intentamos configurar proyección de globo
-      try {
-        map.setProjection({ type: "globe" });
-      } catch (e) {
-        console.warn("La proyección de globo no está soportada:", e);
-      }
+      setLoadedStyleUrl(parsingStyleUrlRef.current);
+      onMapLoadRef.current?.(map);
+    });
 
-      setIsStyleLoaded(true);
-      if (onMapLoad) {
-        onMapLoad(map);
+    // Con relieve activo, MapLibre congela la elevación de la cámara durante flyTo/easeTo y no la
+    // vuelve a descongelar: si el relieve del destino aún no había cargado, la cámara se queda a la
+    // altura del lugar anterior (flotando, o bajo las montañas con el mapa en blanco). Al terminar
+    // cada movimiento la descongelamos para que se recalcule con el terreno real.
+    map.on("moveend", () => {
+      const internal = map as unknown as { _elevationFreeze?: boolean };
+      if (map.getTerrain() && internal._elevationFreeze) {
+        internal._elevationFreeze = false;
+        map.triggerRepaint();
       }
     });
 
-    // Agregar brújula y navegación clásica
+    // Agregar zoom y brújula
     map.addControl(new maplibregl.NavigationControl({
-      visualizePitch: true,
       showZoom: true,
       showCompass: false
     }), "bottom-right");
 
-    map.addControl(new ResetBearingControl(), "bottom-right");
+    map.addControl(new ResetBearingControl({ label: "Restablecer orientación" }), "bottom-right");
 
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      map.remove();
+      mapRef.current = null;
+      setLoadedStyleUrl(null);
     };
   }, []);
 
-  const isFirstRender = useRef(true);
-
-  // Cambiar estilo dinámicamente si cambia styleUrl
+  // Cargar el estilo (y cambiarlo dinámicamente si cambia styleUrl)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    setIsStyleLoaded(false);
-    map.setStyle(styleUrl);
+
+    const sky = isDarkStyle(styleUrl) ? DARK_SKY : LIGHT_SKY;
+    map.setStyle(styleUrl, {
+      // Recarga completa: el diff de estilos de MapLibre falla cuando el terreno está activo
+      diff: false,
+      // Inyectar el globo y el cielo en el propio estilo, así se ven desde el primer fotograma
+      transformStyle: (_previous, next) => {
+        parsingStyleUrlRef.current = styleUrl;
+        return { ...next, projection: { type: "globe" }, sky };
+      },
+    });
   }, [styleUrl]);
 
   // Sincronizar fuentes y capas que dependen del estado del estilo actual
@@ -165,482 +240,224 @@ export const Map3D: React.FC<Map3DProps> = ({
     const map = mapRef.current;
     if (!map || !isStyleLoaded) return;
 
-    // 1. SATÉLITE (Híbrido)
-    if (showSatellite) {
-      if (!map.getSource(SATELLITE_SOURCE_ID)) {
-        map.addSource(SATELLITE_SOURCE_ID, SATELLITE_SOURCE);
-      }
-      if (!map.getLayer(SATELLITE_LAYER_ID)) {
-        // Para que sea híbrido (Satélite de fondo pero calles y etiquetas vectoriales encima),
-        // buscamos la primera capa que sea una calle (line) o texto (symbol) para meter el satélite justo antes.
-        const layers = map.getStyle().layers;
-        let firstOverlayId = undefined;
-        for (const layer of layers) {
-          if (layer.type === "line" || layer.type === "symbol") {
-            firstOverlayId = layer.id;
-            break;
-          }
-        }
-        map.addLayer({
-          id: SATELLITE_LAYER_ID,
-          type: "raster",
-          source: SATELLITE_SOURCE_ID,
-          paint: { "raster-opacity": 1 }
-        }, firstOverlayId);
-      } else {
-        map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", "visible");
-      }
-
-      // Limitar zoom máximo para evitar que aparezca el error "Map data not yet available" de Esri en Huancayo
-      map.setMaxZoom(17);
-      if (map.getZoom() > 17) {
-        map.setZoom(17);
-      }
-    } else {
-      if (map.getLayer(SATELLITE_LAYER_ID)) {
-        map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", "none");
-      }
-      map.setMaxZoom(20); // Permitir zoom máximo normal en modos mapa vectorial
-    }
-
-    // 2. TERRENO 3D (Relieve)
-    if (enableTerrain) {
-      if (!map.getSource(TERRAIN_SOURCE_ID)) {
-        map.addSource(TERRAIN_SOURCE_ID, TERRAIN_SOURCE);
-      }
-      map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 1.5 });
-    } else {
-      map.setTerrain(null);
-    }
-
-    // 3. EDIFICIOS 3D
-    const buildingLayerId = "3d-buildings-extrusion";
-    if (enable3DBuildings && !showSatellite) {
-      if (!map.getLayer(buildingLayerId)) {
-        // Buscar el nombre de la fuente vectorial disponible en el estilo actual
-        // (OpenFreeMap usa 'openmaptiles' o 'osm', CartoDB usa 'cartodb')
-        const sources = map.getStyle().sources;
-        let sourceName = "openmaptiles"; // fallback
-        if (sources.openmaptiles) {
-          sourceName = "openmaptiles";
-        } else if (sources.osm) {
-          sourceName = "osm";
-        } else if (sources.cartodb) {
-          sourceName = "cartodb";
-        } else {
-          for (const key in sources) {
-            if (sources[key].type === "vector") {
-              sourceName = key;
-              break;
-            }
-          }
-        }
-
-        const isDark = styleUrl.toLowerCase().includes("dark");
-        const buildingColors = isDark
-          ? [
-              "interpolate",
-              ["linear"],
-              ["coalesce", ["get", "height"], 15],
-              0, "#1e293b",       // Edificios muy bajos (slate oscuro)
-              20, "#334155",      // Estándar (slate medio)
-              50, "#475569",      // Medianos
-              150, "#64748b"      // Rascacielos altos
-            ]
-          : [
-              "interpolate",
-              ["linear"],
-              ["coalesce", ["get", "height"], 15],
-              0, "#f3f4f6",       // Edificios muy bajos (gris off-white)
-              20, "#e5e7eb",      // Estándar (gris claro)
-              50, "#d1d5db",      // Medianos
-              150, "#9ca3af"      // Rascacielos altos
-            ];
-
-        map.addLayer({
-          id: buildingLayerId,
-          source: sourceName,
-          "source-layer": "building",
-          type: "fill-extrusion",
-          minzoom: 13,
-          paint: {
-            "fill-extrusion-color": buildingColors as any,
-            "fill-extrusion-height": [
-              "coalesce",
-              ["get", "render_height"],
-              ["get", "height"],
-              15
-            ],
-            "fill-extrusion-base": [
-              "coalesce",
-              ["get", "render_min_height"],
-              ["get", "min_height"],
-              0
-            ],
-            "fill-extrusion-opacity": isDark ? 0.9 : 0.85
-          }
-        });
-      } else {
-        map.setLayoutProperty(buildingLayerId, "visibility", "visible");
-      }
-    } else {
-      if (map.getLayer(buildingLayerId)) {
-        map.setLayoutProperty(buildingLayerId, "visibility", "none");
-      }
-    }
-
-    // Asegurar proyección de globo después de mutaciones del estilo
-    try {
-      map.setProjection({ type: "globe" });
-    } catch (e) {
-      console.warn("La proyección de globo no está soportada en el sync effect:", e);
-    }
+    syncSatellite(map, showSatellite);
+    syncTerrain(map, enableTerrain);
+    syncBuildings(map, enable3DBuildings && !showSatellite, isDarkStyle(styleUrl));
   }, [isStyleLoaded, showSatellite, enableTerrain, enable3DBuildings, styleUrl]);
 
-  // Sincronizar Marcadores
+  // Sincronizar Marcadores (son elementos DOM: sobreviven a los cambios de estilo)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isStyleLoaded) return;
+    if (!map) return;
 
-    // Limpiar marcadores antiguos
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    // Crear nuevos marcadores
-    markers.forEach(item => {
-      const el = document.createElement("div");
-      
-      if (item.imageUrl) {
-        // Avatar circular
-        el.className = "custom-marker-avatar";
-        el.style.backgroundImage = `url(${item.imageUrl})`;
-      } else {
-        // Punto rojo pulsante
-        el.className = "custom-marker-red-dot";
-      }
-
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (onMarkerClick) {
-          onMarkerClick(item);
-        }
-      });
-
-      const markerInstance = new maplibregl.Marker({ element: el })
+    const instances = markers.map((item) =>
+      new maplibregl.Marker({
+        element: createMarkerElement(item, () => onMarkerClickRef.current?.(item)),
+        // El avatar es un pin: su punta (abajo) señala el lugar exacto
+        anchor: item.imageUrl ? "bottom" : "center",
+      })
         .setLngLat(item.coordinates)
-        .addTo(map);
+        .addTo(map)
+    );
 
-      markersRef.current.push(markerInstance);
-    });
-  }, [markers, isStyleLoaded]);
+    return () => instances.forEach((marker) => marker.remove());
+  }, [markers]);
 
   // Sincronizar Popup georreferenciado
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isStyleLoaded) return;
-
-    // Cerrar/limpiar popup anterior
-    if (popupRef.current) {
-      popupRef.current.remove();
-      popupRef.current = null;
-    }
-    if (popupRootRef.current) {
-      popupRootRef.current.unmount();
-      popupRootRef.current = null;
-    }
-
-    if (!selectedPlace) return;
-
-    const container = document.createElement("div");
+    if (!map || !selectedPlace) return;
 
     const popup = new maplibregl.Popup({
       closeButton: false,
       closeOnClick: false,
       className: "custom-place-popup",
       anchor: "bottom",
-      offset: [0, -35]
+      offset: [0, selectedPlace.imageUrl ? POPUP_OFFSET_AVATAR : POPUP_OFFSET_DOT],
+      maxWidth: "none",
     })
       .setLngLat(selectedPlace.coordinates)
-      .setDOMContent(container)
+      .setDOMContent(popupContainer)
       .addTo(map);
 
-    popupRef.current = popup;
+    return () => {
+      popup.remove();
+    };
+  }, [selectedPlace, popupContainer]);
 
-    const root = createRoot(container);
-    popupRootRef.current = root;
-
-    root.render(
-      <PlaceDetailCard
-        place={selectedPlace}
-        onClose={() => {
-          if (onClosePopup) onClosePopup();
-        }}
-        onZoom={() => {
-          map.flyTo({
-            center: selectedPlace.coordinates,
-            zoom: 19.2,
-            pitch: 70,
-            bearing: map.getBearing() + 45,
-            duration: 2000
-          });
-        }}
-        onNext={() => {
-          if (onNextPopup) onNextPopup(selectedPlace);
-        }}
-      />
-    );
-
-    popup.on("close", () => {
-      popupRef.current = null;
-      if (popupRootRef.current) {
-        popupRootRef.current.unmount();
-        popupRootRef.current = null;
-      }
+  const handleZoom = (place: MarkerData) => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.flyTo({
+      center: place.coordinates,
+      zoom: 19.2,
+      pitch: 70,
+      bearing: map.getBearing() + 45,
+      duration: 2000
     });
-
-  }, [selectedPlace, isStyleLoaded]);
+  };
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
+      {selectedPlace &&
+        createPortal(
+          <PlaceDetailCard
+            place={selectedPlace}
+            onClose={() => onClosePopup?.()}
+            onZoom={() => handleZoom(selectedPlace)}
+            onNext={() => onNextPopup?.(selectedPlace)}
+          />,
+          popupContainer
+        )}
     </div>
   );
 };
 
-// --- COMPONENTE INTERNO: TARJETA DE DETALLE DEL LUGAR ---
-interface PlaceDetailCardProps {
-  place: MarkerData;
-  onClose: () => void;
-  onZoom: () => void;
-  onNext: () => void;
+/** Crea el elemento DOM de un marcador: avatar circular si tiene imagen, o punto rojo pulsante. */
+function createMarkerElement(item: MarkerData, onSelect: () => void): HTMLElement {
+  // MapLibre posiciona este contenedor con `transform`; los efectos visuales van en el hijo
+  // para que una transición CSS no haga que el marcador "flote" detrás del mapa al moverlo.
+  const el = document.createElement("div");
+  el.className = "map-marker";
+  el.tabIndex = 0;
+  el.title = item.title;
+  el.setAttribute("aria-label", item.title);
+
+  const visual = document.createElement("div");
+  if (item.imageUrl) {
+    visual.className = "custom-marker-avatar";
+    visual.style.backgroundImage = `url("${item.imageUrl}")`;
+  } else {
+    visual.className = "custom-marker-red-dot";
+  }
+  el.appendChild(visual);
+
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onSelect();
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect();
+    }
+  });
+
+  return el;
 }
 
-const PlaceDetailCard: React.FC<PlaceDetailCardProps> = ({
-  place,
-  onClose,
-  onZoom,
-  onNext,
-}) => {
-  return (
-    <div
-      style={{
-        width: "330px",
-        backgroundColor: "rgba(15, 23, 42, 0.94)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid rgba(255, 255, 255, 0.15)",
-        borderRadius: "20px",
-        overflow: "hidden",
-        boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)",
-        color: "#f8fafc",
-        fontFamily: "Inter, sans-serif",
-        position: "relative",
-      }}
-    >
-      {/* Imagen de cabecera si existe */}
-      {place.imageUrl && (
-        <div
-          style={{
-            width: "100%",
-            height: "130px",
-            backgroundImage: `url(${place.imageUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            position: "relative",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: "40px",
-              background: "linear-gradient(transparent, rgba(15, 23, 42, 0.94))",
-            }}
-          />
-        </div>
-      )}
+/** Satélite (híbrido): imágenes de Esri de fondo, con calles y etiquetas vectoriales encima. */
+function syncSatellite(map: maplibregl.Map, visible: boolean) {
+  if (visible) {
+    if (!map.getSource(SATELLITE_SOURCE_ID)) {
+      map.addSource(SATELLITE_SOURCE_ID, SATELLITE_SOURCE);
+    }
+    if (!map.getLayer(SATELLITE_LAYER_ID)) {
+      // Buscamos la primera capa que sea una calle (line) o texto (symbol) para meter el satélite justo antes
+      const firstOverlayId = map
+        .getStyle()
+        .layers.find((layer) => layer.type === "line" || layer.type === "symbol")?.id;
+      map.addLayer({
+        id: SATELLITE_LAYER_ID,
+        type: "raster",
+        source: SATELLITE_SOURCE_ID,
+      }, firstOverlayId);
+    } else {
+      map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", "visible");
+    }
+  } else if (map.getLayer(SATELLITE_LAYER_ID)) {
+    map.setLayoutProperty(SATELLITE_LAYER_ID, "visibility", "none");
+  }
 
-      {/* Botón Cerrar */}
-      <button
-        onClick={onClose}
-        style={{
-          position: "absolute",
-          top: "12px",
-          right: "12px",
-          width: "28px",
-          height: "28px",
-          borderRadius: "50%",
-          backgroundColor: "rgba(15, 23, 42, 0.6)",
-          border: "1px solid rgba(255, 255, 255, 0.2)",
-          color: "#94a3b8",
-          fontSize: "14px",
-          lineHeight: "26px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 2,
-        }}
-      >
-        ✕
-      </button>
+  // setMaxZoom también reduce el zoom actual si supera el nuevo límite
+  map.setMaxZoom(visible ? SATELLITE_MAX_ZOOM : MAX_ZOOM);
+}
 
-      {/* Contenido de la tarjeta */}
-      <div style={{ padding: "16px" }}>
-        {/* Badges */}
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
-          {/* Badge 3D Live */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              backgroundColor: "rgba(239, 68, 68, 0.15)",
-              border: "1px solid rgba(239, 68, 68, 0.4)",
-              borderRadius: "20px",
-              padding: "2px 8px",
-              fontSize: "0.65rem",
-              fontWeight: 700,
-              color: "#f87171",
-              letterSpacing: "0.03em",
-            }}
-          >
-            <span
-              style={{
-                width: "5px",
-                height: "5px",
-                backgroundColor: "#ef4444",
-                borderRadius: "50%",
-                display: "inline-block",
-                animation: "pulseRed 1.5s infinite",
-              }}
-            />
-            <style>{`
-              @keyframes pulseRed {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.4); opacity: 0.5; }
-                100% { transform: scale(1); opacity: 1; }
-              }
-            `}</style>
-            3D LIVE
-          </div>
+/** Terreno 3D (relieve). */
+function syncTerrain(map: maplibregl.Map, enabled: boolean) {
+  if (enabled) {
+    if (!map.getSource(TERRAIN_SOURCE_ID)) {
+      map.addSource(TERRAIN_SOURCE_ID, TERRAIN_SOURCE);
+    }
+    if (!map.getTerrain()) {
+      map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION });
+    }
+  } else if (map.getTerrain()) {
+    map.setTerrain(null);
+  }
+}
 
-          {/* Tag Categoría */}
-          {place.category && (
-            <div
-              style={{
-                backgroundColor: "rgba(59, 130, 246, 0.15)",
-                border: "1px solid rgba(59, 130, 246, 0.3)",
-                borderRadius: "20px",
-                padding: "2px 8px",
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                color: "#60a5fa",
-                letterSpacing: "0.03em",
-              }}
-            >
-              {place.category}
-            </div>
-          )}
-        </div>
+/** Edificios 3D (fill-extrusion), con colores según el tema claro u oscuro. */
+function syncBuildings(map: maplibregl.Map, visible: boolean, isDark: boolean) {
+  const { layers, sources } = map.getStyle();
 
-        {/* Título y Descripción */}
-        <h3 style={{ margin: "0 0 6px 0", fontSize: "1.1rem", fontWeight: 700, color: "#ffffff" }}>
-          {place.title}
-        </h3>
-        <p style={{ margin: "0 0 12px 0", fontSize: "0.78rem", color: "#cbd5e1", lineHeight: "1.35" }}>
-          {place.description}
-        </p>
+  // Ocultar los edificios 3D que ya trae el estilo base: los nuestros los reemplazan,
+  // así no se dibujan dos veces y el interruptor "Edificios 3D" los controla todos.
+  for (const layer of layers) {
+    if (layer.type === "fill-extrusion" && layer.id !== BUILDINGS_LAYER_ID && layer.layout?.visibility !== "none") {
+      map.setLayoutProperty(layer.id, "visibility", "none");
+    }
+  }
 
-        {/* Estado */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.7rem", fontWeight: 600, color: "#10b981", marginBottom: "14px" }}>
-          <span style={{ width: "5px", height: "5px", backgroundColor: "#10b981", borderRadius: "50%" }} />
-          ABIERTO AHORA
-        </div>
+  if (map.getLayer(BUILDINGS_LAYER_ID)) {
+    map.setLayoutProperty(BUILDINGS_LAYER_ID, "visibility", visible ? "visible" : "none");
+    return;
+  }
+  if (!visible) return;
 
-        {/* Botones de acción */}
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          {place.websiteUrl && (
-            <a
-              href={place.websiteUrl}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "6px",
-                backgroundColor: "#3b82f6",
-                border: "none",
-                borderRadius: "10px",
-                padding: "8px 12px",
-                color: "#ffffff",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                textDecoration: "none",
-                cursor: "pointer",
-                boxShadow: "0 4px 10px rgba(59, 130, 246, 0.25)",
-                transition: "background-color 0.2s ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#3b82f6")}
-            >
-              <span style={{ fontSize: "0.9rem" }}>✈</span> Ir al sitio
-            </a>
-          )}
+  // Buscar la fuente vectorial del estilo actual
+  // (OpenFreeMap usa 'openmaptiles', otros proveedores 'osm' o 'cartodb')
+  const isVector = (id: string) => sources[id]?.type === "vector";
+  const sourceId = ["openmaptiles", "osm", "cartodb"].find(isVector) ?? Object.keys(sources).find(isVector);
+  if (!sourceId) return;
 
-          {/* Botón de Zoom */}
-          <button
-            onClick={onZoom}
-            style={{
-              width: "34px",
-              height: "34px",
-              borderRadius: "10px",
-              backgroundColor: "rgba(255, 255, 255, 0.06)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "#ffffff",
-              fontSize: "14px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background-color 0.15s ease",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)")}
-            title="Acercar vista 3D"
-          >
-            🔎
-          </button>
+  const colors = isDark
+    ? {
+        low: "#1e293b",       // Edificios muy bajos (slate oscuro)
+        standard: "#334155",  // Estándar (slate medio)
+        medium: "#475569",    // Medianos
+        tall: "#64748b",      // Rascacielos altos
+      }
+    : {
+        low: "#f3f4f6",       // Edificios muy bajos (gris off-white)
+        standard: "#e5e7eb",  // Estándar (gris claro)
+        medium: "#d1d5db",    // Medianos
+        tall: "#9ca3af",      // Rascacielos altos
+      };
 
-          {/* Botón Siguiente */}
-          <button
-            onClick={onNext}
-            style={{
-              width: "34px",
-              height: "34px",
-              borderRadius: "10px",
-              backgroundColor: "rgba(255, 255, 255, 0.06)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "#ffffff",
-              fontSize: "12px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background-color 0.15s ease",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)")}
-            title="Siguiente lugar"
-          >
-            ➔
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+  // Insertar debajo de la primera capa de texto para que las etiquetas queden por encima
+  const firstSymbolId = layers.find((layer) => layer.type === "symbol")?.id;
+
+  map.addLayer({
+    id: BUILDINGS_LAYER_ID,
+    source: sourceId,
+    "source-layer": "building",
+    type: "fill-extrusion",
+    minzoom: 13,
+    paint: {
+      "fill-extrusion-color": [
+        "interpolate",
+        ["linear"],
+        ["coalesce", ["get", "render_height"], ["get", "height"], 15],
+        0, colors.low,
+        20, colors.standard,
+        50, colors.medium,
+        150, colors.tall
+      ],
+      "fill-extrusion-height": [
+        "coalesce",
+        ["get", "render_height"],
+        ["get", "height"],
+        15
+      ],
+      "fill-extrusion-base": [
+        "coalesce",
+        ["get", "render_min_height"],
+        ["get", "min_height"],
+        0
+      ],
+      "fill-extrusion-opacity": isDark ? 0.9 : 0.85
+    }
+  }, firstSymbolId);
+}

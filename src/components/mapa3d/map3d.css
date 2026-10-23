@@ -1,0 +1,332 @@
+/* ---------- Marcadores ---------- */
+
+/* Contenedor que posiciona MapLibre con `transform`: no le ponemos transform ni transition
+   propios (los efectos van en el hijo) para que el marcador no "flote" al mover el mapa. */
+.map-marker {
+  cursor: pointer;
+  outline: none;
+}
+
+.map-marker:hover,
+.map-marker:focus-visible {
+  z-index: 1;
+}
+
+.map-marker:focus-visible > * {
+  outline: 2px solid #818cf8;
+  outline-offset: 3px;
+}
+
+/* Marcador personalizado de punto rojo pulsante */
+.custom-marker-red-dot {
+  width: 14px;
+  height: 14px;
+  background-color: #ef4444;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.custom-marker-red-dot::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ef4444;
+  animation: marker-pulse-ring 1.8s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+  pointer-events: none;
+}
+
+@keyframes marker-pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Marcador personalizado con imagen circular (Avatar) */
+.custom-marker-avatar {
+  width: 44px;
+  height: 44px;
+  /* Reserva el espacio que el pin sobresale por debajo: con anchor "bottom" su punta señala el lugar exacto */
+  margin-bottom: 6px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  background-color: #1e293b;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  transform-origin: 50% 100%;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.map-marker:hover .custom-marker-avatar {
+  transform: scale(1.15) translateY(-2px);
+}
+
+/* El pin de conexión (puntero) debajo del avatar circular */
+.custom-marker-avatar::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid #ffffff;
+  pointer-events: none;
+}
+
+/* ---------- Popup ---------- */
+
+/* Sobrescribir el popup de MapLibre para nuestro diseño premium */
+.maplibregl-popup.custom-place-popup {
+  z-index: 15;
+  animation: popup-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.maplibregl-popup.custom-place-popup .maplibregl-popup-content {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Colorear el tip de conexión (flecha) según el fondo de nuestra tarjeta */
+.maplibregl-popup.custom-place-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: rgba(15, 23, 42, 0.94);
+}
+
+@keyframes popup-fade-in {
+  from {
+    transform: scale(0.9) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ---------- Tarjeta de detalle del lugar ---------- */
+
+.place-card {
+  position: relative;
+  width: min(330px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  background-color: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  color: #f8fafc;
+  font-family: var(--font-sans);
+}
+
+.place-card button,
+.place-card a {
+  font-family: inherit;
+}
+
+.place-card__image {
+  position: relative;
+  width: 100%;
+  height: 130px;
+  background-color: #1e293b;
+  background-size: cover;
+  background-position: center;
+}
+
+.place-card__image::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, rgba(15, 23, 42, 0.94));
+}
+
+.place-card__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(15, 23, 42, 0.6);
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.place-card__close:hover {
+  color: #ffffff;
+  background-color: rgba(15, 23, 42, 0.85);
+}
+
+.place-card__body {
+  padding: 16px;
+}
+
+.place-card__badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  /* Que los badges no queden debajo del botón cerrar cuando no hay imagen */
+  padding-right: 32px;
+}
+
+.place-card__badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.place-card__badge--live {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.place-card__badge--category {
+  background-color: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+.place-card__live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  animation: place-card-pulse 1.5s infinite;
+}
+
+@keyframes place-card-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.place-card__title {
+  margin: 0 0 6px 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #ffffff;
+}
+
+.place-card__description {
+  margin: 0 0 12px 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #cbd5e1;
+}
+
+.place-card__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.place-card__status--closed {
+  color: #f87171;
+}
+
+.place-card__status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.place-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.place-card__link {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background-color: #3b82f6;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 18px;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.place-card__link:hover {
+  background-color: #2563eb;
+}
+
+.place-card__icon-btn {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+
+.place-card__icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.place-card :is(button, a):focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .custom-marker-red-dot::after,
+  .place-card__live-dot,
+  .maplibregl-popup.custom-place-popup {
+    animation: none;
+  }
+}

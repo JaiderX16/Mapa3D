@@ -1,32 +1,46 @@
-# React + TypeScript + Vite
+# Mapa 3D
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Globo terráqueo 3D interactivo hecho con **React + TypeScript + Vite** y **MapLibre GL**.
+Permite volar a lugares icónicos del mundo y explorarlos con relieve, edificios en 3D e imágenes satelitales.
 
-Currently, two official plugins are available:
+## Funcionalidades
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 🌍 Proyección de globo con atmósfera y cielo (claro u oscuro según el estilo).
+- ⛰️ Relieve 3D del terreno (tiles Terrarium de AWS) con exageración ×1.5.
+- 🏙️ Edificios 3D extruidos con colores según su altura.
+- 🛰️ Tres estilos: **Mapa**, **Satélite** (híbrido con calles y etiquetas) y **Oscuro**.
+- ✈️ Vuelos animados a 11 destinos; al aterrizar se abre la tarjeta del lugar.
+- 📍 Marcadores con tarjeta de detalle: acercar la vista 3D, ir al sitio web o pasar al siguiente lugar.
+- ⌨️ Accesible con teclado (marcadores enfocables, <kbd>Esc</kbd> cierra la tarjeta) y adaptado a móvil.
 
-## React Compiler
+## Uso
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev      # servidor de desarrollo
+npm run build    # typecheck + build de producción en dist/
+npm run lint     # oxlint
+npm run preview  # sirve el build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Estructura
+
+```
+src/
+├── App.tsx / App.css              # Panel lateral, estilos de mapa y lógica de vuelos
+├── data/destinations.ts           # Destinos y sus marcadores
+└── components/mapa3d/
+    ├── Map3D.tsx                  # Mapa: estilo, globo, terreno, satélite, edificios, marcadores y popup
+    ├── PlaceDetailCard.tsx        # Tarjeta de detalle del lugar
+    ├── ResetBearingControl.ts     # Brújula que restablece rumbo e inclinación
+    ├── map3d.css                  # Marcadores, popup y tarjeta
+    └── reset-bearing-control.css  # Controles del mapa
+```
+
+Para añadir un destino basta con agregar un objeto a `DESTINATIONS` en `src/data/destinations.ts`.
+
+## Fuentes de datos
+
+- Mapas vectoriales: [OpenFreeMap](https://openfreemap.org) (© OpenStreetMap contributors)
+- Relieve: [Terrain Tiles de AWS Open Data](https://registry.opendata.aws/terrain-tiles/)
+- Satélite: Esri World Imagery
